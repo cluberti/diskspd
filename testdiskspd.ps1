@@ -5,7 +5,7 @@ $FileSizeInGB = "100" #Must be 1 or higher
 $TimeInSeconds = "10"  #Must be 1 or higher
 $WritePercentage = "0"  #Setting to 0 causes 100% read test
 $ThreadsPerFile = "1"  #Must be 1 or higher
-$FileName = "O:\testfile.dat"  #Filename and path to use as test
+$FileName = "C:\testfile.dat"  #Filename and path to use as test
 $RandomIO = "False"  #True/False
 $CachingDisabled = "None"  #All/Windows/None
 
@@ -24,7 +24,7 @@ $CachingDisabled = "None"  #All/Windows/None
 
 Write-Host "  This script performs a disk performance test using diskspd.exe." -ForegroundColor Cyan
 Write-Host "    This script assumes diskspd.exe is located in C:\Windows" -ForegroundColor Yellow
-Write-Host "    Edit this script at line 93 if the binary is located elsewhere." -ForegroundColor Yellow
+Write-Host "    Edit this script at line 108 if the binary is located elsewhere." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "    https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223"
 Write-Host ""
