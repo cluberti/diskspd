@@ -1,51 +1,79 @@
-$ErrorActionPreference = "SilentlyContinue"
+# Parse Params:
+[CmdletBinding()]
+Param(
+    [Parameter(
+        Position=0,
+        Mandatory=$False,
+        HelpMessage="The file to use or create - this will test the drive with the file's drive letter; if no value passed, C:\testfile.dat is used"
+        )]
+        $FileName = "C:\testfile.dat",
+    [Parameter(
+        Position=1,
+        Mandatory=$False,
+        HelpMessage="File size in GB to use - must be 1 or higher; if no value passed, 100 is used"
+        )]
+        $FileSizeInGB = "100",
+    [Parameter(
+        Position=2,
+        Mandatory=$False,
+        HelpMessage="Queue depth up to which to stress controller - will start at 1 and go up to the specified number (1, 4, 8, 16, 32, 64, 128); if no value passed, 32 is used"
+        )]
+        [ValidateSet('1', '4', '8', '16', '32', '64', '128')]
+        $QueueDepth = "32",
+    [Parameter(
+        Position=3,
+        Mandatory=$False,
+        HelpMessage="Duration in seconds; if not specified, 10 is used"
+        )]
+        $TimeInSeconds = "10",
+    [Parameter(
+        Position=4,
+        Mandatory=$False,
+        HelpMessage="Write percentage, 0-100; if not specified, 0 is used (100% read test)"
+        )]
+        $WritePercentage = "0",
+    [Parameter(
+        Position=5,
+        Mandatory=$False,
+        HelpMessage="Number of CPU threads to use per file - must be 1 or higher; if not specified, 1 is used"
+        )]
+        $ThreadsPerFile = "1",
+    [Parameter(
+        Position=6,
+        Mandatory=$False,
+        HelpMessage="Test Random I/O vs sequention, True/False; if not specified, False is used (run sequential I/O test)"
+        )]
+        $RandomIO = $False,
+    [Parameter(
+        Position=7,
+        Mandatory=$False,
+        HelpMessage="Caching type disabled, valid values are All, Windows, or None; if not specified, 'None' is used (all caching enabled)"
+        )]
+        [ValidateSet('None', 'Windows', 'All')]
+        $CachingDisabled = "None",
+    [Parameter(
+        Position=8,
+        Mandatory=$False,
+        HelpMessage="DiskSpd.exe location; if not specified, it is assumed to be in C:\Windows"
+        )]
+        $DiskSpd = "C:\Windows\diskspd.exe"
+    )
 
 
-$FileSizeInGB = "100" #Must be 1 or higher
-$TimeInSeconds = "10"  #Must be 1 or higher
-$WritePercentage = "0"  #Setting to 0 causes 100% read test
-$ThreadsPerFile = "1"  #Must be 1 or higher
-$FileName = "C:\testfile.dat"  #Filename and path to use as test
-$RandomIO = "False"  #True/False
-$CachingDisabled = "None"  #All/Windows/None
+Function Run-Test
+{
+    Param ($FileSizeInGB, $TimeInSeconds, $WritePercentage, $ThreadsPerFile, $FileName, $QueueDepth, $BlockSize, $RandomIO, $CachingDisabled)
+    # diskspd.exe parameters:
 
-
-# diskspd.exe parameters:
-
-# -c size of testfile.dat
-# -d duration of test in seconds
-# -r random I/O (SQL OLTP)
-# -w percentage writes
-# -t number of threads per file
-# -o number of queued I/Os (test queue depth performance)
-# -b size of writes (8K for SQL load test)
-# -h bypass write cache in software AND hardware
-# -L measure latency in ms
-
-Write-Host "  This script performs a disk performance test using diskspd.exe." -ForegroundColor Cyan
-Write-Host "    This script assumes diskspd.exe is located in C:\Windows" -ForegroundColor Yellow
-Write-Host "    Edit this script at line 108 if the binary is located elsewhere." -ForegroundColor Yellow
-Write-Host ""
-Write-Host "    https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223"
-Write-Host ""
-
-
-Write-Host "##########################" -ForegroundColor Magenta
-Write-Host "Legend:" -ForegroundColor Cyan
-Write-Host " - QD  = Queue Depth" -ForegroundColor Gray
-Write-Host " - IO  = IO Operations/Sec" -ForegroundColor Gray
-Write-Host " - MB  = MB/sec throughput" -ForegroundColor Gray
-Write-Host " - L   = Latency (ms)" -ForegroundColor Gray
-Write-Host " - CPU = Avg CPU%" -ForegroundColor Gray
-Write-Host "##########################" -ForegroundColor Magenta
-Write-Host ""
-Write-Host ""
-Write-Host ""
-
-
-Function Run-Test {
-    param ($FileSizeInGB, $TimeInSeconds, $WritePercentage, $ThreadsPerFile, $FileName, $BlockSize, $RandomIO, $CachingDisabled)
-    
+    # -c size of testfile.dat
+    # -d duration of test in seconds
+    # -r random I/O (SQL OLTP)
+    # -w percentage writes
+    # -t number of threads per file
+    # -o number of queued I/Os (test queue depth performance)
+    # -b size of writes (8K for SQL load test)
+    # -h bypass write cache in software AND hardware
+    # -L measure latency in ms
 
     $c = "-c" + $FileSizeInGB + "G"
     $d = "-d" + $TimeInSeconds
@@ -53,8 +81,6 @@ Function Run-Test {
     $t = "-t" + $ThreadsPerFile
     $b = "-b" + $BlockSize
     $L = "-L " + $FileName
-
-
     If ($CachingDisabled -eq "All")
     {
         $x = "-h"
@@ -65,14 +91,14 @@ Function Run-Test {
     }
     ElseIf ($CachingDisabled -eq "None")
     {
-        $x = ""
+        $x = $null
     }
-    
-    If ($RandomIO -eq "True")
+
+    If ($RandomIO -eq $True)
     {
         $r = "-r"
     }
-    ElseIf ($RandomIO -eq "False")
+    ElseIf ($RandomIO -eq $False)
     {
         If ($ThreadsPerFile -eq "1")
         {
@@ -83,58 +109,89 @@ Function Run-Test {
             $r = "-si"
         }
     }
-    
 
-    ForEach ($i in 1..1) {
-        If ($BlockSize -eq "4K" -or $BlockSize -eq "8K")
+    If ($BlockSize -eq "4K")
+    {
+        Write-Host ""
+        Write-Host ""
+        Write-Host "Starting test..." -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host ""
+        Write-Host "######" -ForegroundColor Yellow
+        Write-Host "  $BlockSize" -ForegroundColor Yellow
+        Write-Host "######" -ForegroundColor Yellow
+    }
+    ElseIf ($BlockSize -eq "8K")
+    {
+        Write-Host "######" -ForegroundColor Yellow
+        Write-Host "  $BlockSize" -ForegroundColor Yellow
+        Write-Host "######" -ForegroundColor Yellow
+    }
+    Else
+    {
+        Write-Host "#######" -ForegroundColor Yellow
+        Write-Host "  $BlockSize" -ForegroundColor Yellow
+        Write-Host "#######" -ForegroundColor Yellow
+    }
+
+    $DiskSpdOutput = @()
+    ForEach ($i in 1..$QueueDepth)
+    {
+        If ((($i -eq "1") -or ($i -eq "4") -or ($i -eq "8") -or ($i -eq "16") -or ($i -eq "32") -or ($i -eq "64") -or ($i -eq "128")) -and ($i -le $QueueDepth))
         {
-            Write-Host "######" -ForegroundColor Yellow
-            Write-Host "  $BlockSize" -ForegroundColor Yellow
-            Write-Host "######" -ForegroundColor Yellow
-            Write-Host "QD     IO       MB      L     CPU" -ForegroundColor Gray
-            Write-Host "-------------------------------------" -ForegroundColor Gray
+            $o = "-o$i"
+            If ($x -eq $null)
+            {
+                $Result = Invoke-Expression -Command "$DiskSpd $c $d $r $w $t $o $b $L"
+            }
+            Else
+            {
+                $Result = Invoke-Expression -Command "$DiskSpd $c $d $r $w $t $o $b $x $L"
+            }
+            
+            ForEach ($line in $result)
+            {
+                If ($line -like "total:*")
+                {
+                    $total=$line; break
+                }
+            }
+            Foreach ($line in $result)
+            {
+                If ($line -like "avg.*")
+                {
+                    $avg=$line; break
+                }
+            }
+
+            $Object = [PSCustomObject]@{
+                QD        = $i
+                IO        = $total.Split("|")[3].Trim()
+                MB        = $total.Split("|")[2].Trim()
+                L         = $total.Split("|")[4].Trim()
+                CPU       = $avg.Split("|")[1].Trim()
+            }
+            $DiskSpdOutput += $Object
         }
         Else
         {
-            Write-Host "#######" -ForegroundColor Yellow
-            Write-Host "  $BlockSize" -ForegroundColor Yellow
-            Write-Host "#######" -ForegroundColor Yellow
-            Write-Host "QD     IO       MB      L     CPU" -ForegroundColor Gray
-            Write-Host "-------------------------------------" -ForegroundColor Gray
+            # Do nothing, not a valid test queue depth - keep looping until 1, 4, 8, 16, 32, 64, or 12, up until this hits $QueueDepth
         }
-        
-
-        $QueueDepth   = "-o$i"
-        $result = Invoke-Expression -Command "C:\Windows\diskspd.exe $c $d $r $w $t $QueueDepth $b $x $L"
-
-     
-        foreach ($line in $result)
-        {
-            if ($line -like "total:*")
-            {
-                $total=$line; break
-            }
-        }
-        foreach ($line in $result)
-        {
-            if ($line -like "avg.*")
-            {
-                $avg=$line; break
-            }
-        }
-        $mbps = $total.Split("|")[2].Trim()
-        $iops = $total.Split("|")[3].Trim()
-        $latency = $total.Split("|")[4].Trim()
-        $cpu = $avg.Split("|")[1].Trim()
-        "$i  $iops  $mbps  $latency  $cpu"
-        Write-Host ""
     }
+    $DiskSpdOutput | Format-Table -AutoSize
 }
 
 
 
+Clear-Host
+Write-Host "  This script performs a disk performance test using diskspd.exe." -ForegroundColor Cyan
+Write-Host "    This script is using $Diskspd for this test" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "    https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223"
+Write-Host ""
 Write-Host "##########################" -ForegroundColor Green
 Write-Host "This test pass:" -ForegroundColor Cyan
+
 If ($CachingDisabled -eq "All")
 {
     $x = "-h"
@@ -154,12 +211,12 @@ ElseIf ($CachingDisabled -eq "None")
 Write-Host " - $FileSizeInGB GB file" -ForegroundColor Gray
 Write-Host "   ($FileName)"
 
-If ($RandomIO -eq "True")
+If ($RandomIO -eq $True)
 {
     $r = "-r"
     Write-Host " - random I/O" -ForegroundColor Gray
 }
-ElseIf ($RandomIO -eq "False")
+ElseIf ($RandomIO -eq $False)
 {
     $r = "-si"
     Write-Host " - Sequential I/O" -ForegroundColor Gray
@@ -174,6 +231,7 @@ Else
 {
     Write-Host " - $ThreadsPerFile threads" -ForegroundColor Gray
 }
+
 If ($WritePercentage -eq "0")
 {
     Write-Host " - 100% reads" -ForegroundColor Gray
@@ -182,13 +240,30 @@ Else
 {
     Write-Host " - $WritePercentage% Write" -ForegroundColor Gray
 }
+
+Write-Host " - Queue depth $QueueDepth" -ForegroundColor Gray
 Write-Host "##########################" -ForegroundColor Green
 Write-Host ""
-
+Write-Host ""
+Write-Host "##########################" -ForegroundColor Magenta
+Write-Host "Legend:" -ForegroundColor Cyan
+Write-Host " - QD  = Queue Depth" -ForegroundColor Gray
+Write-Host " - IO  = IO Operations/Sec" -ForegroundColor Gray
+Write-Host " - MB  = MB/sec throughput" -ForegroundColor Gray
+Write-Host " - L   = Latency (ms)" -ForegroundColor Gray
+Write-Host " - CPU = Avg CPU%" -ForegroundColor Gray
+Write-Host "##########################" -ForegroundColor Magenta
 
 # Run-Test params:
-Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName "4K" $RandomIO $CachingDisabled
-Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName "8K" $RandomIO $CachingDisabled
-Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName "16K" $RandomIO $CachingDisabled
-Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName "32K" $RandomIO $CachingDisabled
-Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName "64K" $RandomIO $CachingDisabled
+Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName $QueueDepth "4K" $RandomIO $CachingDisabled
+Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName $QueueDepth "8K" $RandomIO $CachingDisabled
+Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName $QueueDepth "16K" $RandomIO $CachingDisabled
+Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName $QueueDepth "32K" $RandomIO $CachingDisabled
+Run-Test $FileSizeInGB $TimeInSeconds $WritePercentage $ThreadsPerFile $FileName $QueueDepth "64K" $RandomIO $CachingDisabled
+
+# Delete temporary file
+Start-Sleep 5
+Write-Host ""
+Write-Host ""
+Write-Host "Deleting temporary file $FileName to cleanup..." -ForegroundColor Cyan
+Remove-Item -Path $FileName -Force
