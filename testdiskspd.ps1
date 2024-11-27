@@ -10,9 +10,9 @@ Param(
     [Parameter(
         Position=1,
         Mandatory=$False,
-        HelpMessage="File size in GB to use - must be 1 or higher; if no value passed, 100 is used"
+        HelpMessage="File size in GB to use - must be 1 or higher; if no value passed, 50 is used"
         )]
-        $FileSizeInGB = "100",
+        $FileSizeInGB = "50",
     [Parameter(
         Position=2,
         Mandatory=$False,
@@ -23,15 +23,15 @@ Param(
     [Parameter(
         Position=3,
         Mandatory=$False,
-        HelpMessage="Duration in seconds; if not specified, 10 is used"
+        HelpMessage="Duration in seconds; if not specified, 100 is used"
         )]
-        $TimeInSeconds = "10",
+        $TimeInSeconds = "100",
     [Parameter(
         Position=4,
         Mandatory=$False,
-        HelpMessage="Write percentage, 0-100; if not specified, 0 is used (100% read test)"
+        HelpMessage="Write percentage, 0-100; if not specified, 30 is used (30% write/70% read test)"
         )]
-        $WritePercentage = "0",
+        $WritePercentage = "30",
     [Parameter(
         Position=5,
         Mandatory=$False,
@@ -54,9 +54,9 @@ Param(
     [Parameter(
         Position=8,
         Mandatory=$False,
-        HelpMessage="DiskSpd.exe location; if not specified, it is assumed to be in C:\Windows"
+        HelpMessage="DiskSpd.exe location; if not specified, it is assumed to be in the root of C:"
         )]
-        $DiskSpd = "C:\Windows\diskspd.exe"
+        $DiskSpd = "C:\diskspd.exe"
     )
 
 
@@ -134,7 +134,7 @@ Function Run-Test
         Write-Host "#######" -ForegroundColor Yellow
     }
 
-    $DiskSpdOutput = @()
+    $DiskSpdOutput = [System.Collections.Generic.List[PSObject]]::new()
     ForEach ($i in 1..$QueueDepth)
     {
         If ((($i -eq "1") -or ($i -eq "4") -or ($i -eq "8") -or ($i -eq "16") -or ($i -eq "32") -or ($i -eq "64") -or ($i -eq "128")) -and ($i -le $QueueDepth))
@@ -148,19 +148,19 @@ Function Run-Test
             {
                 $Result = Invoke-Expression -Command "$DiskSpd $c $d $r $w $t $o $b $x $L"
             }
-            
-            ForEach ($line in $result)
+
+            Foreach ($Line in $result)
             {
-                If ($line -like "total:*")
+                If ($Line -like "*avg.*")
                 {
-                    $total=$line; break
+                    $avg=$line; BREAK
                 }
             }
-            Foreach ($line in $result)
+            ForEach ($Line in $Result)
             {
-                If ($line -like "avg.*")
+                If ($Line -like "total:*")
                 {
-                    $avg=$line; break
+                    $total=$Line; BREAK
                 }
             }
 
@@ -171,14 +171,11 @@ Function Run-Test
                 L         = $total.Split("|")[4].Trim()
                 CPU       = $avg.Split("|")[1].Trim()
             }
-            $DiskSpdOutput += $Object
-        }
-        Else
-        {
-            # Do nothing, not a valid test queue depth - keep looping until 1, 4, 8, 16, 32, 64, or 12, up until this hits $QueueDepth
+            $DiskSpdOutput.Add($Object)
         }
     }
     $DiskSpdOutput | Format-Table -AutoSize
+    Write-Host ""
 }
 
 
